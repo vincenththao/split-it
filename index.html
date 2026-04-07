@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Group Split</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 20px; max-width: 500px; margin: auto; background: #f2f2f7; color: #1c1c1e; }
+        h1 { font-size: 24px; text-align: center; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        input, select, button { width: 100%; padding: 12px; margin-top: 8px; margin-bottom: 16px; border: 1px solid #d1d1d6; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
+        button { background: #007aff; color: white; border: none; font-weight: bold; cursor: pointer; }
+        button:active { background: #0056b3; }
+        .btn-secondary { background: #e5e5ea; color: #1c1c1e; }
+        .btn-danger { background: #ff3b30; color: white; margin-top: 0; padding: 6px; font-size: 14px; width: auto;}
+        .btn-edit { background: #ffcc00; color: #1c1c1e; margin-top: 0; padding: 6px; font-size: 14px; width: auto;}
+        .expense-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #eee; }
+        .expense-actions { display: flex; gap: 8px; }
+        .result { font-weight: bold; color: #34c759; margin-top: 10px; padding: 10px; background: #e5f9e7; border-radius: 8px; text-align: center;}
+    </style>
+</head>
+<body>
+
+    <h1>💸 Split It</h1>
+
+    <div class="card" id="setup-section">
+        <h3>1. Who is in the group?</h3>
+        <input type="text" id="person-name" placeholder="Enter name (e.g., Alice)">
+        <button onclick="addPerson()">Add Person</button>
+        <p id="people-list">People: None</p>
+    </div>
+
+    <div class="card" id="expense-section" style="display: none;">
+        <h3 id="form-title">2. Add an Expense</h3>
+        <input type="hidden" id="edit-index" value="-1">
+        <input type="text" id="desc" placeholder="What was it? (e.g., Dinner)">
+        <input type="number" id="amount" placeholder="Total Amount ($)">
+        <select id="payer"></select> <button id="save-btn" onclick="saveExpense()">Add Expense</button>
+        <button id="cancel-btn" class="btn-secondary" style="display:none;" onclick="cancelEdit()">Cancel Edit</button>
+    </div>
+
+    <div class="card" id="review-section" style="display: none;">
+        <h3>Review Expenses</h3>
+        <div id="expense-list"></div>
+    </div>
+
+    <div class="card" id="calc-section" style="display: none;">
+        <h3>3. Ready to settle?</h3>
+        <button onclick="calculateSettlement()">Calculate Who Owes Who</button>
+        <div id="results"></div>
+    </div>
+
+    <script>
+        let people = [];
+        let expenses = []; // We now store expenses as an array of objects
+
+        function addPerson() {
+            let name = document.getElementById("person-name").value.trim();
+            if (name && !people.includes(name)) {
+                people.push(name);
+                document.getElementById("person-name").value = "";
+                document.getElementById("people-list").innerText = "People: " + people.join(", ");
+                updatePayerDropdown();
+                
+                if(people.length >= 2) {
+                    document.getElementById("expense-section").style.display = "block";
+                    document.getElementById("calc-section").style.display = "block";
+                }
+            }
+        }
+
+        function updatePayerDropdown() {
+            let select = document.getElementById("payer");
+            let currentValue = select.value; // Remember who was selected
+            select.innerHTML = "";
+            people.forEach(person => {
+                let option = document.createElement("option");
+                option.value = person;
+                option.text = person + " paid";
+                select.appendChild(option);
+            });
+            if(currentValue && people.includes(currentValue)) select.value = currentValue;
+        }
+
+        function saveExpense() {
+            let desc = document.getElementById("desc").value;
+            let amount = parseFloat(document.getElementById("amount").value);
+            let payer = document.getElementById("payer").value;
+            let editIndex = parseInt(document.getElementById("edit-index").value);
+
+            if (!desc || !amount || !payer) return alert("Please fill everything out!");
+
+            let expenseData = { desc, amount, payer };
+
+            if (editIndex === -1) {
+                // Add new
+                expenses.push(expenseData);
+            } else {
+                // Update existing
+                expenses[editIndex] = expenseData;
+                cancelEdit(); // Reset form
+            }
+
+            // Clear inputs and refresh list
+            document.getElementById("desc").value = "";
+            document.getElementById("amount").value = "";
+            renderExpenseList();
+        }
+
+        function renderExpenseList() {
+            let listDiv = document.getElementById("expense-list");
+            listDiv.innerHTML = "";
+            
+            if (expenses.length > 0) {
+                document.getElementById("review-section").style.display = "block";
+            } else {
+                document.getElementById("review-section").style.display = "none";
+            }
+
+            expenses.forEach((exp, index) => {
+                listDiv.innerHTML += `
+                    <div class="expense-item">
+                        <div><b>${exp.desc}</b>: $${exp.amount} (Paid by ${exp.payer})</div>
+                        <div class="expense-actions">
+                            <button class="btn-edit" onclick="editExpense(${index})">Edit</button>
+                            <button class="btn-danger" onclick="deleteExpense(${index})">X</button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function editExpense(index) {
+            let exp = expenses[index];
+            document.getElementById("desc").value = exp.desc;
+            document.getElementById("amount").value = exp.amount;
+            document.getElementById("payer").value = exp.payer;
+            document.getElementById("edit-index").value = index;
+            
+            document.getElementById("form-title").innerText = "Edit Expense";
+            document.getElementById("save-btn").innerText = "Update Expense";
+            document.getElementById("cancel-btn").style.display = "block";
+            
+            // Scroll back up to the form
+            document.getElementById("expense-section").scrollIntoView({behavior: "smooth"});
+        }
+
+        function cancelEdit() {
+            document.getElementById("desc").value = "";
+            document.getElementById("amount").value = "";
+            document.getElementById("edit-index").value = "-1";
+            document.getElementById("form-title").innerText = "2. Add an Expense";
+            document.getElementById("save-btn").innerText = "Add Expense";
+            document.getElementById("cancel-btn").style.display = "none";
+        }
+
+        function deleteExpense(index) {
+            if(confirm("Delete this expense?")) {
+                expenses.splice(index, 1);
+                renderExpenseList();
+            }
+        }
+
+        function calculateSettlement() {
+            // 1. Calculate fresh balances from the expenses list
+            let balances = {};
+            people.forEach(p => balances[p] = 0); // Start everyone at 0
+
+            expenses.forEach(exp => {
+                balances[exp.payer] += exp.amount; // Payer gets credit
+                let split = exp.amount / people.length;
+                people.forEach(p => balances[p] -= split); // Everyone gets charged
+            });
+
+            // 2. Sort into Debtors (-) and Creditors (+)
+            let debtors = [];
+            let creditors = [];
+            for (let person in balances) {
+                if (balances[person] < -0.01) debtors.push({ name: person, amount: Math.abs(balances[person]) });
+                else if (balances[person] > 0.01) creditors.push({ name: person, amount: balances[person] });
+            }
+
+            debtors.sort((a, b) => b.amount - a.amount);
+            creditors.sort((a, b) => b.amount - a.amount);
+
+            // 3. Match them up
+            let resultsHTML = "";
+            let i = 0, j = 0;
+
+            while (i < debtors.length && j < creditors.length) {
+                let settleAmount = Math.min(debtors[i].amount, creditors[j].amount);
+                resultsHTML += `<div class='result'>💸 ${debtors[i].name} owes ${creditors[j].name} <b>$${settleAmount.toFixed(2)}</b></div>`;
+
+                debtors[i].amount -= settleAmount;
+                creditors[j].amount -= settleAmount;
+
+                if (debtors[i].amount < 0.01) i++;
+                if (creditors[j].amount < 0.01) j++;
+            }
+
+            if(resultsHTML === "") resultsHTML = "<div class='result'>Everyone is settled up!</div>";
+            document.getElementById("results").innerHTML = resultsHTML;
+        }
+    </script>
+</body>
+</html>
